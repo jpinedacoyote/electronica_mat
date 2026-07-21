@@ -1,0 +1,407 @@
+#include <LedControl.h>
+
+LedControl lc = LedControl(12, 11, 10, 1);
+
+// Botones
+const int arriba = 2;
+const int abajo = 3;
+const int izquierda = 4;
+const int derecha = 5;
+
+// Serpiente
+int x[64];
+int y[64];
+int longitud = 3;
+
+// Dirección
+int dirX = 1;
+int dirY = 0;
+
+// Manzana
+int manzanaX;
+int manzanaY;
+
+// Vidas
+int vidas = 3;
+
+// Tiempo
+unsigned long ultimoMovimiento = 0;
+const int VELOCIDAD = 700;
+
+// Pausa
+bool pausa = false;
+bool comboAnterior = false;
+unsigned long ultimoParpadeo = 0;
+bool mostrarPantalla = true;
+const int TIEMPO_PARPADEO = 400;
+
+// Game Over
+bool gameOver = false;
+unsigned long ultimoParpadeoManzana = 0;
+bool mostrarManzana = true;
+
+// Funciones
+void botones();
+void mover();
+bool perdio();
+void comer();
+void crearManzana();
+void dibujar();
+void reiniciarSerpiente();
+void reiniciarPosicion();
+void perderVida();
+void mostrarNumero(int numero);
+void mostrarGameOverParpadeando();
+bool algunBotonPresionado();
+void reiniciarJuego();
+void parpadeoComida();
+
+void setup() {
+  lc.shutdown(0, false);
+  lc.setIntensity(0, 8);
+  lc.clearDisplay(0);
+
+  pinMode(arriba, INPUT_PULLUP);
+  pinMode(abajo, INPUT_PULLUP);
+  pinMode(izquierda, INPUT_PULLUP);
+  pinMode(derecha, INPUT_PULLUP);
+
+  randomSeed(analogRead(A0));
+
+  reiniciarJuego();
+}
+
+void loop() {
+
+  if (gameOver) {
+    mostrarGameOverParpadeando();
+
+    if (algunBotonPresionado()) {
+      delay(250);
+      reiniciarJuego();
+    }
+
+    return;
+  }
+
+  botones();
+
+  if (pausa) {
+    if (millis() - ultimoParpadeo >= TIEMPO_PARPADEO) {
+      ultimoParpadeo = millis();
+      mostrarPantalla = !mostrarPantalla;
+
+      if (mostrarPantalla) {
+        dibujar();
+      } else {
+        lc.clearDisplay(0);
+      }
+    }
+
+    return;
+  }
+
+  if (millis() - ultimoMovimiento >= VELOCIDAD) {
+    mover();
+
+    if (perdio()) {
+      perderVida();
+      ultimoMovimiento = millis();
+      return;
+    }
+
+    comer();
+    dibujar();
+
+    ultimoMovimiento = millis();
+  }
+}
+
+// Leer botones
+void botones() {
+  bool presionaIzquierda = digitalRead(izquierda) == LOW;
+  bool presionaDerecha = digitalRead(derecha) == LOW;
+
+  bool comboPausa = presionaIzquierda && presionaDerecha;
+
+  if (comboPausa && !comboAnterior) {
+    pausa = !pausa;
+    mostrarPantalla = true;
+    ultimoParpadeo = millis();
+    dibujar();
+    delay(200);
+  }
+
+  comboAnterior = comboPausa;
+
+  if (pausa) {
+    return;
+  }
+
+  if (digitalRead(arriba) == LOW && dirY != 1) {
+    dirX = 0;
+    dirY = -1;
+  }
+
+  if (digitalRead(abajo) == LOW && dirY != -1) {
+    dirX = 0;
+    dirY = 1;
+  }
+
+  if (presionaIzquierda && !presionaDerecha && dirX != 1) {
+    dirX = -1;
+    dirY = 0;
+  }
+
+  if (presionaDerecha && !presionaIzquierda && dirX != -1) {
+    dirX = 1;
+    dirY = 0;
+  }
+}
+
+// Mover serpiente
+void mover() {
+  for (int i = longitud; i > 0; i--) {
+    x[i] = x[i - 1];
+    y[i] = y[i - 1];
+  }
+
+  x[0] += dirX;
+  y[0] += dirY;
+}
+
+// Detectar pérdida
+bool perdio() {
+  if (x[0] < 0 || x[0] > 7 || y[0] < 0 || y[0] > 7) {
+    return true;
+  }
+
+  for (int i = 1; i < longitud; i++) {
+    if (x[0] == x[i] && y[0] == y[i]) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// Comer manzana
+void comer() {
+  if (x[0] == manzanaX && y[0] == manzanaY) {
+    parpadeoComida();
+
+    if (longitud < 63) {
+      longitud++;
+    }
+
+    crearManzana();
+  }
+}
+
+// Crear manzana
+void crearManzana() {
+  bool valida;
+
+  do {
+    valida = true;
+
+    manzanaX = random(0, 8);
+    manzanaY = random(0, 8);
+
+    for (int i = 0; i < longitud; i++) {
+      if (manzanaX == x[i] && manzanaY == y[i]) {
+        valida = false;
+      }
+    }
+
+  } while (!valida);
+}
+
+// Dibujar juego
+void dibujar() {
+  lc.clearDisplay(0);
+
+  lc.setLed(0, manzanaY, manzanaX, true);
+
+  for (int i = 0; i < longitud; i++) {
+    lc.setLed(0, y[i], x[i], true);
+  }
+}
+
+// Parpadeo cuando come
+void parpadeoComida() {
+  for (int i = 0; i < 3; i++) {
+    lc.clearDisplay(0);
+    delay(80);
+
+    dibujar();
+    delay(80);
+  }
+}
+
+// Reinicia todo desde cero
+void reiniciarSerpiente() {
+  longitud = 3;
+
+  x[0] = 3;
+  y[0] = 3;
+
+  x[1] = 2;
+  y[1] = 3;
+
+  x[2] = 1;
+  y[2] = 3;
+
+  dirX = 1;
+  dirY = 0;
+}
+
+// Reinicia solo la posición, pero conserva la longitud
+void reiniciarPosicion() {
+  x[0] = 3;
+  y[0] = 3;
+
+  dirX = 1;
+  dirY = 0;
+
+  for (int i = 1; i < longitud; i++) {
+    x[i] = x[i - 1] - 1;
+    y[i] = 3;
+
+    if (x[i] < 0) {
+      x[i] = 0;
+    }
+  }
+
+  crearManzana();
+  dibujar();
+}
+
+// Perder vida
+void perderVida() {
+  vidas--;
+
+  mostrarNumero(vidas);
+  delay(1200);
+
+  if (vidas <= 0) {
+    gameOver = true;
+    lc.clearDisplay(0);
+    return;
+  }
+
+  reiniciarPosicion();
+}
+
+// Mostrar número
+void mostrarNumero(int numero) {
+  lc.clearDisplay(0);
+
+  byte n0[8] = {
+    B00111100,
+    B01100110,
+    B01101110,
+    B01110110,
+    B01100110,
+    B01100110,
+    B00111100,
+    B00000000
+  };
+
+  byte n1[8] = {
+    B00011000,
+    B00111000,
+    B00011000,
+    B00011000,
+    B00011000,
+    B00011000,
+    B01111110,
+    B00000000
+  };
+
+  byte n2[8] = {
+    B00111100,
+    B01100110,
+    B00000110,
+    B00001100,
+    B00011000,
+    B00110000,
+    B01111110,
+    B00000000
+  };
+
+  byte n3[8] = {
+    B00111100,
+    B01100110,
+    B00000110,
+    B00011100,
+    B00000110,
+    B01100110,
+    B00111100,
+    B00000000
+  };
+
+  for (int fila = 0; fila < 8; fila++) {
+    if (numero == 0) {
+      lc.setRow(0, fila, n0[fila]);
+    } else if (numero == 1) {
+      lc.setRow(0, fila, n1[fila]);
+    } else if (numero == 2) {
+      lc.setRow(0, fila, n2[fila]);
+    } else if (numero == 3) {
+      lc.setRow(0, fila, n3[fila]);
+    }
+  }
+}
+
+// Manzana parpadeando en Game Over
+void mostrarGameOverParpadeando() {
+  if (millis() - ultimoParpadeoManzana >= 400) {
+    ultimoParpadeoManzana = millis();
+    mostrarManzana = !mostrarManzana;
+
+    lc.clearDisplay(0);
+
+    if (mostrarManzana) {
+      byte manzana[8] = {
+        B00011000,
+        B00001000,
+        B00111100,
+        B01111110,
+        B01111110,
+        B01111110,
+        B00111100,
+        B00000000
+      };
+
+      for (int fila = 0; fila < 8; fila++) {
+        lc.setRow(0, fila, manzana[fila]);
+      }
+    }
+  }
+}
+ 
+// Detectar cualquier botón
+bool algunBotonPresionado() {
+  return digitalRead(arriba) == LOW ||
+         digitalRead(abajo) == LOW ||
+         digitalRead(izquierda) == LOW ||
+         digitalRead(derecha) == LOW;
+}
+
+// Reiniciar todo el juego
+void reiniciarJuego() {
+  vidas = 3;
+  gameOver = false;
+  pausa = false;
+  longitud = 3;
+
+  mostrarNumero(vidas);
+  delay(1000);
+
+  reiniciarSerpiente();
+  crearManzana();
+  dibujar();
+
+  ultimoMovimiento = millis();
+}
