@@ -1,0 +1,210 @@
+#include <LedControl.h>
+
+LedControl lc = LedControl(12, 11, 10, 1);
+
+const int UMBRAL = 500;
+
+int x = 3;
+int y = 3;
+
+//Rotación del triángulo
+int rotacion = 0;
+
+//Giro automático cada 500 ms
+unsigned long ultimoGiro = 0;
+const unsigned long TIEMPO_GIRO = 500;
+
+void setup() {
+
+  Serial.begin(9600);
+
+  lc.shutdown(0, false);
+  lc.setIntensity(0, 8);
+  lc.clearDisplay(0);
+}
+
+void loop() {
+
+  bool arriba    = analogRead(A0) < UMBRAL;
+  bool derecha   = analogRead(A1) < UMBRAL;
+  bool izquierda = analogRead(A2) < UMBRAL;
+  bool abajo     = analogRead(A3) < UMBRAL;
+
+  //Si los 4 sensores están tapados, gira continuamente
+  if (arriba && derecha && izquierda && abajo) {
+
+    if (millis() - ultimoGiro >= TIEMPO_GIRO) {
+
+      rotacion++;
+
+      if (rotacion > 3) {
+        rotacion = 0;
+      }
+
+      ultimoGiro = millis();
+    }
+  }
+
+  //Centro por defecto
+  x = 3;
+  y = 3;
+
+  //Esquina superior izquierda
+  if (arriba && izquierda && !derecha && !abajo) {
+
+    x = 1;
+    y = 1;
+
+  }
+
+  //Esquina superior derecha
+  else if (arriba && derecha && !izquierda && !abajo) {
+
+    x = 6;
+    y = 1;
+
+  }
+
+  //Esquina inferior izquierda
+  else if (abajo && izquierda && !arriba && !derecha) {
+
+    x = 1;
+    y = 6;
+
+  }
+
+  //Esquina inferior derecha
+  else if (abajo && derecha && !arriba && !izquierda) {
+
+    x = 6;
+    y = 6;
+
+  }
+
+  //Arriba
+  else if (arriba && !derecha && !izquierda && !abajo) {
+
+    x = 3;
+    y = 1;
+
+  }
+
+  //Abajo
+  else if (abajo && !derecha && !izquierda && !arriba) {
+
+    x = 3;
+    y = 6;
+
+  }
+
+  //Izquierda
+  else if (izquierda && !arriba && !abajo && !derecha) {
+
+    x = 1;
+    y = 3;
+
+  }
+
+  //Derecha
+  else if (derecha && !arriba && !abajo && !izquierda) {
+
+    x = 6;
+    y = 3;
+  }
+
+  dibujarTriangulo();
+
+  delay(50);
+}
+
+void dibujarTriangulo() {
+
+  lc.clearDisplay(0);
+
+  switch (rotacion) {
+
+    // ▲ ARRIBA
+    case 0:
+
+      if (y > 0)
+        lc.setLed(0, y - 1, x, true);
+
+      lc.setLed(0, y, x, true);
+
+      if (y < 7) {
+
+        if (x > 0)
+          lc.setLed(0, y + 1, x - 1, true);
+
+        lc.setLed(0, y + 1, x, true);
+
+        if (x < 7)
+          lc.setLed(0, y + 1, x + 1, true);
+      }
+
+      break;
+
+    // ► DERECHA
+    case 1:
+
+      if (x < 7)
+        lc.setLed(0, y, x + 1, true);
+
+      lc.setLed(0, y, x, true);
+
+      if (x > 0) {
+
+        if (y > 0)
+          lc.setLed(0, y - 1, x - 1, true);
+
+        lc.setLed(0, y, x - 1, true);
+
+        if (y < 7)
+          lc.setLed(0, y + 1, x - 1, true);
+      }
+
+      break;
+
+    // ▼ ABAJO
+    case 2:
+
+      if (y < 7)
+        lc.setLed(0, y + 1, x, true);
+
+      lc.setLed(0, y, x, true);
+
+      if (y > 0) {
+
+        if (x > 0)
+          lc.setLed(0, y - 1, x - 1, true);
+
+        lc.setLed(0, y - 1, x, true);
+
+        if (x < 7)
+          lc.setLed(0, y - 1, x + 1, true);
+      }
+
+      break;
+
+    // ◄ IZQUIERDA
+    case 3:
+
+      if (x > 0)
+        lc.setLed(0, y, x - 1, true);
+
+      lc.setLed(0, y, x, true);
+
+      if (x < 7) {
+
+        if (y > 0)
+          lc.setLed(0, y - 1, x + 1, true);
+
+        lc.setLed(0, y, x + 1, true);
+
+        if (y < 7)
+          lc.setLed(0, y + 1, x + 1, true);
+      }
+
+      break;
+  }
+}
